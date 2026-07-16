@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Architecture-is-Cool — מדריך למפתח</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --muted: #5a5a72;
+    --card-bg: #f7f7fb;
+    --border: #e0e0ea;
+    --accent: #5b5bd6;
+    --accent-soft: #eeeefc;
+    --code-bg: #f0f0f7;
+    --node-fill: #eeeefc;
+    --node-border: #5b5bd6;
+    --node-critic-fill: #fff2e8;
+    --node-critic-border: #d97706;
+    --node-rec-fill: #e9f9f0;
+    --node-rec-border: #16a34a;
+    --ok: #16a34a;
+    --warn: #d97706;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14141f;
+    --fg: #e8e8f0;
+    --muted: #9a9ab0;
+    --card-bg: #1c1c2c;
+    --border: #2e2e42;
+    --accent: #9393f0;
+    --accent-soft: #26264a;
+    --code-bg: #1a1a2a;
+    --node-fill: #26264a;
+    --node-border: #9393f0;
+    --node-critic-fill: #3a2a1a;
+    --node-critic-border: #e0a458;
+    --node-rec-fill: #1a3a28;
+    --node-rec-border: #4ade80;
+    --ok: #4ade80;
+    --warn: #e0a458;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14141f;
+      --fg: #e8e8f0;
+      --muted: #9a9ab0;
+      --card-bg: #1c1c2c;
+      --border: #2e2e42;
+      --accent: #9393f0;
+      --accent-soft: #26264a;
+      --code-bg: #1a1a2a;
+      --node-fill: #26264a;
+      --node-border: #9393f0;
+      --node-critic-fill: #3a2a1a;
+      --node-critic-border: #e0a458;
+      --node-rec-fill: #1a3a28;
+      --node-rec-border: #4ade80;
+      --ok: #4ade80;
+      --warn: #e0a458;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", "Rubik", Arial, sans-serif;
+    line-height: 1.7;
+  }
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  header.hero { margin-bottom: 40px; }
+  header.hero .eyebrow {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  h1 { font-size: 2rem; margin: 8px 0 4px; }
+  .subtitle {
+    color: var(--muted);
+    font-size: 1.05rem;
+    max-width: 640px;
+  }
+  h2 {
+    font-size: 1.4rem;
+    margin-top: 56px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.1rem; margin-top: 28px; margin-bottom: 10px; color: var(--accent); }
+  p { margin: 10px 0; }
+  ul, ol { padding-inline-start: 22px; }
+  li { margin: 6px 0; }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    direction: ltr;
+    display: inline-block;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.95rem;
+  }
+  th, td {
+    text-align: right;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
+  .tag {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-inline-end: 6px;
+    white-space: nowrap;
+  }
+  .tag-v2 { background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
+  .note {
+    border-inline-start: 4px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+  }
+  .note strong { color: var(--accent); }
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 10px 44px 10px 12px;
+    margin: 8px 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .diagram-wrap {
+    overflow-x: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .diagram { min-width: 640px; }
+  svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+  .node-box   { fill: var(--node-fill);        stroke: var(--node-border);        stroke-width: 1.5; }
+  .node-critic{ fill: var(--node-critic-fill); stroke: var(--node-critic-border); stroke-width: 1.5; }
+  .node-rec   { fill: var(--node-rec-fill);    stroke: var(--node-rec-border);    stroke-width: 1.5; }
+  .node-text    { fill: var(--fg);    font-size: 13px;   font-family: inherit; text-anchor: middle; }
+  .node-subtext { fill: var(--muted); font-size: 10.5px; font-family: inherit; text-anchor: middle; }
+  .edge-line  { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+  .edge-label { fill: var(--muted); font-size: 10.5px; font-family: inherit; text-anchor: middle; }
+  marker path { fill: var(--muted); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow">מדריך למפתח — v1</div>
+    <h1>Architecture-is-Cool</h1>
+    <p class="subtitle">
+      צ'אט RAG ללימוד דזיין פטרנס וארכיטקטורה — עם בדיקת הבנה אמיתית מול מקור,
+      לא רק תקציר טקסט. המסמך הזה נותן את התמונה הגדולה לפני שיושבים על הקוד.
+    </p>
+  </header>
+
+  <h2>1. מה בונים, בפסקה אחת</h2>
+  <p>
+    המשתמש (מפתח מנוסה) בוחר <strong>נושא</strong> מכפתורים (למשל "Strategy Pattern",
+    "CQRS") — <strong>או מדביק URL של מאמר משלו</strong> והמערכת קולטת אותו חי. לכל נושא
+    יש שלוש דרכים קלילות להבין (בדיחה / אנלוגיה / קוד לפי רמה), אבל הלב של המוצר הוא
+    <strong>מצב מבחן</strong>: הצ'אט שואל שאלה מעוגנת בקטע המקור, המשתמש עונה בטקסט חופשי,
+    וסוכן <strong>Critic</strong> מעריך את התשובה <strong>מול המקור עצמו</strong> — לא מול
+    "ידע כללי" של המודל. בסוף מוצע נושא קשור שעוד לא נלמד.
+  </p>
+  <div class="note">
+    <strong>למה זה לא "ChatGPT + PDF":</strong> שם אין זיכרון בין הפעלות ואין דרך לדעת אם
+    באמת הבנת. כאן יש קורפוס מצטבר, מעקב התקדמות, והערכה שתמיד מעוגנת בקטע מקור ספציפי.
+    לולאת <strong>הדרכה + בדיקת הבנה</strong> היא המוצר — לא הסיכום.
+  </div>
+
+  <h2>2. דרישות הלקוח (מה חייב לעבוד ב-v1)</h2>
+  <table>
+    <tr><th>#</th><th>יכולת</th><th>בשפה פשוטה</th></tr>
+    <tr><td>F1</td><td>בחירת נושא</td><td>לחיצה על כפתור נושא ← שליפה דטרמיניסטית של קטעי המקור שלו (בלי חיפוש דמיון — lookup ישיר בטבלה)</td></tr>
+    <tr><td><strong>F1.5</strong></td><td><strong>הוספת URL ע"י המשתמש</strong></td><td>המשתמש מדביק כתובת מאמר ← המערכת שולפת, חותכת ומטמיעה אותו חי (~10-30 שניות, עם חיווי טעינה) ← נוצר נושא חדש עם כותרת אוטומטית שמקבל את כל הלולאה. <strong>בנוסף</strong> לכפתורים, לא במקומם</td></tr>
+    <tr><td>F2</td><td>שלושה מצבי הסבר</td><td>בדיחה / אנלוגיה / קוד לפי רמה (ג'וניור, סניור, ארכיטקט) — כולם מעוגנים באותו קטע מקור</td></tr>
+    <tr><td>F3-F4</td><td>מבחן + Critic</td><td>שאלה מעוגנת במקור ← המשתמש עונה חופשי ← הערכה מול קטע המקור, עם הסבר וציטוט</td></tr>
+    <tr><td>F5</td><td>רפרנסים נוספים</td><td>כשהתשובה נפתרת, אפשר להציף קטעים קשורים משאר הקורפוס (multi-hop)</td></tr>
+    <tr><td>F6</td><td>שאלה חופשית</td><td>באמצע נושא אפשר לשאול "מה ההבדל בין זה ל-X?" — שליפה מסוננת לנושא הנוכחי</td></tr>
+    <tr><td>F7</td><td>מעקב התקדמות</td><td>מה הושלם ובאיזה ציון — טבלת SQL רגילה, <strong>בלי</strong> embeddings</td></tr>
+    <tr><td>F8</td><td>המלצת נושא הבא</td><td>דמיון סמנטי בין נושאים, מסונן למה שעוד לא נלמד</td></tr>
+    <tr><td>F9</td><td>מייל תזכורת</td><td>טיזר + שאלת מבחן אחת. משני — לא חוסם שום דבר</td></tr>
+  </table>
+  <p>
+    <span class="tag tag-v2">v2</span> <strong>F10 — מצב הכנה לראיון</strong> נדחה ל-v2
+    בהחלטה מפורשת. התכנון שלו שמור (ARCHITECTURE.md §7.5) כי הוא רק פרמטריזציה של המנוע
+    הקיים — אבל לא בונים אותו עכשיו.
+  </p>
+
+  <h2>3. איך המערכת בנויה — Modular Monolith</h2>
+  <p>
+    Deployment אחד (קונטיינר FastAPI יחיד), אבל גבולות מודול <strong>נאכפים בקוד</strong>:
+    <code>routes</code> לא נוגעים ב-DB/LLM ישירות — רק דרך <code>services</code>;
+    <code>agents</code> לא נוגעים ב-DB ישירות — רק דרך <code>services</code>/<code>vector</code>.
+    שרשרת תלות חד-כיוונית. זה מה שמאפשר לפתח דרישות שונות במקביל בלי דריכה זה על זה.
+  </p>
+  <div class="diagram-wrap">
+    <div class="diagram">
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z"></path>
+          </marker>
+        </defs>
+        <rect x="290" y="16" width="140" height="44" rx="8" class="node-box"></rect>
+        <text x="360" y="34" class="node-text">Next.js Frontend</text>
+        <text x="360" y="50" class="node-subtext">Chat UI + כפתורי נושאים</text>
+
+        <rect x="270" y="96" width="180" height="48" rx="8" class="node-box"></rect>
+        <text x="360" y="116" class="node-text">api/routes</text>
+        <text x="360" y="132" class="node-subtext">HTTP בלבד, ללא לוגיקה</text>
+
+        <rect x="270" y="180" width="180" height="48" rx="8" class="node-box"></rect>
+        <text x="360" y="200" class="node-text">services</text>
+        <text x="360" y="216" class="node-subtext">rag / ingestion / recommendation / cache</text>
+
+        <rect x="60" y="180" width="170" height="48" rx="8" class="node-box"></rect>
+        <text x="145" y="200" class="node-text">agents (LangGraph)</text>
+        <text x="145" y="216" class="node-subtext">Retriever→Router→Critic</text>
+
+        <rect x="270" y="264" width="180" height="48" rx="8" class="node-box"></rect>
+        <text x="360" y="284" class="node-text">vector / DB</text>
+        <text x="360" y="300" class="node-subtext">Postgres + pgvector</text>
+
+        <rect x="500" y="180" width="170" height="48" rx="8" class="node-box"></rect>
+        <text x="585" y="200" class="node-text">LLM / Embedding</text>
+        <text x="585" y="216" class="node-subtext">Provider (Gemini) מאחורי ממשק</text>
+
+        <path d="M360,60 L360,96" class="edge-line" marker-end="url(#arrow)"></path>
+        <path d="M360,144 L360,180" class="edge-line" marker-end="url(#arrow)"></path>
+        <path d="M270,204 L230,204" class="edge-line" marker-end="url(#arrow)"></path>
+        <path d="M360,228 L360,264" class="edge-line" marker-end="url(#arrow)"></path>
+        <path d="M145,228 L145,290 L270,290" class="edge-line" marker-end="url(#arrow)"></path>
+        <path d="M500,204 L450,204" class="edge-line" marker-end="url(#arrow)"></path>
+
+        <text x="700" y="345" class="node-subtext" text-anchor="end">חד-כיווני: routes → agents/services → vector/DB</text>
+      </svg>
+    </div>
+  </div>
+  <div class="note">
+    <strong>למה לא מיקרוסרוויסים?</strong> תשתית מיותרת לפרויקט צד.
+    <strong>למה לא מונוליט "רגיל"?</strong> בלי גבולות אכופים אי אפשר להוכיח שזו באמת
+    מערכת מולטי-אייג'נט ולא "פונקציה אחת גדולה". Modular Monolith נותן את שני העולמות.
+  </div>
+
+  <h2>4. לולאת הליבה — Multi-Agent Graph (LangGraph)</h2>
+  <p>
+    הזרימה מנוהלת כגרף מפורש עם state משותף (<code>TopicState</code>), לא if/else מפוזרים.
+    ה-Critic (כתום) הוא לולאת האנטי-הזיות: סוכן שבודק פלט של סוכן אחר מול מקור.
+  </p>
+  <div class="diagram-wrap">
+    <div class="diagram">
+      <svg viewBox="0 0 760 600" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z"></path>
+          </marker>
+        </defs>
+        <rect x="290" y="10" width="180" height="50" rx="8" class="node-box"></rect>
+        <text x="380" y="30" class="node-text">Retriever</text>
+        <text x="380" y="46" class="node-subtext">topic → chunks (deterministic)</text>
+
+        <rect x="290" y="100" width="180" height="50" rx="8" class="node-box"></rect>
+        <text x="380" y="120" class="node-text">Mode Router</text>
+        <text x="380" y="136" class="node-subtext">בדיחה / אנלוגיה / קוד</text>
+
+        <rect x="290" y="190" width="180" height="50" rx="8" class="node-box"></rect>
+        <text x="380" y="210" class="node-text">Quiz Generator</text>
+        <text x="380" y="226" class="node-subtext">שאלה מעוגנת בקטע</text>
+
+        <rect x="270" y="280" width="220" height="60" rx="8" class="node-critic"></rect>
+        <text x="380" y="304" class="node-text">Quiz Critic</text>
+        <text x="380" y="322" class="node-subtext">הערכה מול המקור + retry_count guard</text>
+
+        <path d="M270,300 C 150,300 150,220 290,215" class="edge-line" marker-end="url(#arrow2)" fill="none"></path>
+        <text x="150" y="255" class="edge-label">שגוי/לא ברור ← הסבר + ניסיון נוסף</text>
+
+        <rect x="270" y="400" width="220" height="55" rx="8" class="node-rec"></rect>
+        <text x="380" y="422" class="node-text">Recommendation Step</text>
+        <text x="380" y="438" class="node-subtext">suggest_related_topic()</text>
+
+        <rect x="290" y="500" width="180" height="50" rx="8" class="node-box"></rect>
+        <text x="380" y="520" class="node-text">נושא מוצע הבא</text>
+        <text x="380" y="536" class="node-subtext">מסונן לפי user_progress + status='ready'</text>
+
+        <path d="M380,60 L380,100" class="edge-line" marker-end="url(#arrow2)"></path>
+        <path d="M380,150 L380,190" class="edge-line" marker-end="url(#arrow2)"></path>
+        <text x="445" y="175" class="edge-label">(מצב מבחן נבחר)</text>
+        <path d="M380,240 L380,280" class="edge-line" marker-end="url(#arrow2)"></path>
+        <path d="M380,340 L380,400" class="edge-line" marker-end="url(#arrow2)"></path>
+        <text x="430" y="375" class="edge-label">(נפתר)</text>
+        <path d="M380,455 L380,500" class="edge-line" marker-end="url(#arrow2)"></path>
+      </svg>
+    </div>
+  </div>
+  <div class="note">
+    <strong>כלל חשוב ל-Critic:</strong> אם המשתמש עונה נכון אבל קטע המקור פשוט לא מכסה את
+    זה — הפסק הוא <code>unclear</code> עם תשובה כנה ("המקור לא מתייחס לזה — הנה מה שהוא כן
+    אומר"), <strong>אף פעם לא</strong> <code>incorrect</code> שגוי. מפתחים מנוסים עונים
+    מניסיון מעבר למאמר — זה תרחיש צפוי, ופסילה שלו תהרוס את האמון בכל הלולאה.
+  </div>
+
+  <h2>5. קליטת URL של משתמש (F1.5) — איך זה עובד</h2>
+  <p>
+    אותו pipeline בדיוק כמו קורפוס ההתחלה (fetch ← חילוץ טקסט ← חיתוך ← embedding ← שמירה),
+    רק שהטריגר הוא בקשת HTTP במקום סקריפט. אין קוד נפרד.
+  </p>
+  <ol class="steps">
+    <li><code>POST /topics/from-url</code> — נוצרת שורת topic עם <code>status='processing'</code>
+        ומזהה חוזר מיד. הקליטה רצה כ-background task של FastAPI (בלי תור/worker).</li>
+    <li>הפרונט עושה polling על <code>GET /topics/{id}</code> ומציג חיווי טעינה עד שהסטטוס מתחלף.</li>
+    <li><strong>בדיקת cache קודם כל</strong> (hash של התוכן): אם ה-URL הזה כבר נקלט פעם —
+        מדלגים על כל העיבוד ומקשרים לתוכן הקיים. הגשה כפולה עולה fetch אחד, כלום מעבר.</li>
+    <li>כותרת הנושא נגזרת אוטומטית: <code>&lt;title&gt;</code> או <code>&lt;h1&gt;</code>
+        של הדף; אם אין — סיכום שורה אחת מה-LLM.</li>
+    <li>בסיום: <code>status='ready'</code> — ומכאן הנושא <strong>זהה לחלוטין</strong> לנושא
+        אוצר: אותה לולאה, אותו גרף, אותו מאגר המלצות. כישלון (URL שבור, דף ריק) ←
+        <code>status='failed'</code> עם סיבה ברורה. אין מצב ביניים תקוע.</li>
+  </ol>
+  <div class="note">
+    <strong>גבולות v1:</strong> בדיקות קלט בסיסיות בלבד — סכימת http(s), תקרת גודל ~2MB,
+    timeout ל-fetch. סינון תוכן/מודרציה/מכסות פר-משתמש — v2 במוצהר.
+  </div>
+
+  <h2>6. סכמת DB (Postgres + pgvector, הכל במסד אחד)</h2>
+  <div class="card">
+    <p><span class="tag">CACHE</span><code>source_files</code> — תוצרי עיבוד לפי <code>content_hash + pipeline_version</code>. פגיעה בקאש = מדלגים על כל העיבוד</p>
+    <p><span class="tag">DOMAIN</span><code>topics</code> — קישור נושא ← מקור. כולל <code>chunk_range</code>, <code>topic_embedding</code>, ו-<code>status</code>/<code>source</code> (בשביל F1.5)</p>
+    <p><span class="tag">RAG</span><code>chunks</code> — יחידת השליפה, embedding לכל קטע. <strong>בלי</strong> topic_id — המיפוי נושא↔קטעים חי רק ב-<code>chunk_range</code> (מקור אמת יחיד)</p>
+    <p><span class="tag">SQL רגיל</span><code>user_progress</code> — הושלם/לא + ציון. <strong>אפס embeddings</strong></p>
+    <p><span class="tag">Audit</span><code>quiz_attempts</code> — כל ניסיון מבחן, כולל ה-retries של ה-Critic</p>
+    <p><span class="tag">CACHE</span><code>generation_cache</code> — תוצרי LLM (בדיחות/אנלוגיות/קוד/שאלות) לפי <code>(topic, mode, level, prompt_version)</code> — ראו סעיף 7</p>
+  </div>
+  <div class="note">
+    <strong>ההפרדה שהכי חשוב לשמור:</strong> <code>user_progress</code> זה lookup
+    ("הושלם? כן/לא"), ומנוע ההמלצות זה דמיון סמנטי. אלה שני עולמות — אסור לערבב, וזה גם
+    ההסבר הכי נקי בראיון.
+  </div>
+
+  <h2>7. עלויות — קאש עצלן, לא הכנה מראש</h2>
+  <p>
+    העיקרון: <strong>שומרים מה שכבר קרה, לא מכינים את מה שעוד לא ביקשו.</strong>
+  </p>
+  <ol class="steps">
+    <li>המשתמש <strong>הראשון</strong> שמבקש שילוב מסוים (נושא × מצב × רמה) מקבל יצירה
+        חיה אמיתית מה-LLM — והתוצאה נשמרת ב-<code>generation_cache</code>.</li>
+    <li>עד <strong>3 גרסאות</strong> נשמרות לכל שילוב: כל עוד יש פחות מ-3 — קוראים ל-LLM
+        ומוסיפים; מ-3 ומעלה — בוחרים גרסה אקראית קיימת, בלי LLM בכלל.</li>
+    <li>הרוטציה בין גרסאות מונעת את התחושה של "אותה בדיחה מילה במילה" — גם המשתמש המאה
+        מרגיש תוכן חי.</li>
+    <li>הקריאה היחידה שלעולם לא נשמרת בקאש: <strong>הערכת ה-Critic</strong> — כל תשובה
+        ייחודית. זה גם הרגע שהכי מוכיח "AI אמיתי" בדמו.</li>
+  </ol>
+  <p>
+    התוצאה: דמו של ~100 משתמשים עולה <strong>פחות מדולר</strong> (מעבר זמני ל-tier בתשלום
+    עם תקרת תקציב ביום הדמו). המלצות הנושא-הקשור הן שאילתת pgvector — חינם, בלי קאש בכלל.
+  </p>
+
+  <h2>8. אבטחה — שלושה שערים</h2>
+  <div class="card">
+    <p><strong>1. API Key + Rate Limiting.</strong> מפתח סטטי ב-header (<code>X-API-Key</code>),
+    בדיקה ב-dependency אחד על כל ה-routes חוץ מ-<code>/health</code>. ה-rate limiting
+    (slowapi) חייב להיות <strong>פר-מפתח/session</strong>, לא רק גלובלי — אחרת משתמש אחד
+    שורף את המכסה של כולם.</p>
+    <p><strong>2. Domain-Scoping Guard.</strong> לפני שהודעת טקסט חופשי מגיעה ל-LLM,
+    בודקים דמיון סמנטי מול קורפוס הנושאים. מתחת לסף ← "העוזר עונה רק על ארכיטקטורה
+    ודזיין פטרנס", בלי לקרוא ל-LLM בכלל. מונע שימוש בצ'אט כפרוקסי חינמי ל-Gemini.
+    <strong>חל רק על קלט חופשי</strong> — לחיצות כפתור לא צריכות בדיקה.</p>
+    <p><strong>3. סודות.</strong> הכל דרך env (<code>core/config.py</code>), אף מפתח בקוד,
+    <code>.env</code> ב-gitignore מהקומיט הראשון, לוגים בלי תוכן פרומפטים.</p>
+  </div>
+  <div class="note">
+    <strong>הסף של ה-guard (0.55) הוא placeholder</strong> — לפני נעילה מכיילים אמפירית:
+    סקריפט שמריץ ~20-30 שאלות בתחום ומחוץ לתחום ומראה את התפלגות הציונים. הערך יושב ב-env,
+    לא בקוד.
+  </div>
+
+  <h2>9. סטאק טכנולוגי</h2>
+  <table>
+    <tr><th>רכיב</th><th>טכנולוגיה</th><th>למה</th></tr>
+    <tr><td>שפה</td><td>Python 3.12</td><td></td></tr>
+    <tr><td>API</td><td>FastAPI + Uvicorn</td><td>async-first, סטנדרט</td></tr>
+    <tr><td>ולידציה</td><td>Pydantic v2</td><td>גם ל-structured output של הסוכנים</td></tr>
+    <tr><td>ORM + מיגרציות</td><td>SQLAlchemy 2.x async + Alembic</td><td></td></tr>
+    <tr><td>DB</td><td>PostgreSQL + pgvector</td><td>מסד אחד לכל דבר — state, קאש, וקטורים</td></tr>
+    <tr><td>אורקסטרציית סוכנים</td><td>LangGraph 1.x (GA)</td><td>גרף מפורש עם state משותף, לא if/else</td></tr>
+    <tr><td>LLM + Embeddings</td><td>Gemini</td><td>מאחורי <code>LLMProvider</code>/<code>EmbeddingProvider</code> — החלפת ספק = שינוי config, לא קוד</td></tr>
+    <tr><td>Frontend</td><td>Next.js</td><td></td></tr>
+    <tr><td>פריסה</td><td>Supabase (DB) + Render (backend) + Vercel (frontend)</td><td>עלות אפס בפיתוח</td></tr>
+    <tr><td>טסטים + CI</td><td>pytest + ruff, GitHub Actions</td><td>Fake providers — אף טסט לא צריך API key אמיתי</td></tr>
+  </table>
+
+  <h2>10. סדר עבודה — במה מתחילים</h2>
+  <p>
+    הפירוק המלא נמצא ב-<code>docs/TASKS.md</code> (משימות לפי דרישה, עם בעלות קבצים שמונעת
+    התנגשויות). בגדול:
+  </p>
+  <ol class="steps">
+    <li><strong>Phase 0 — תשתית:</strong> Docker, config, DB, ממשקי Provider, והקפאת
+        <code>TopicState</code> — זה החוזה שכל הסוכנים בונים מולו.</li>
+    <li><strong>Phase 1 — דאטה:</strong> pipeline הקליטה (R1) + מעקב התקדמות (R7) —
+        במקביל, אין קבצים משותפים.</li>
+    <li><strong>Phase 2 — נושאים:</strong> R2 (טבלת topics + routes) — שער קצר שחוסם את
+        השאר. מיד אחריו R1.5 (קליטת URL) — מקבילי לכל מה שבא אחר כך.</li>
+    <li><strong>Phase 3 — הליבה:</strong> שלד הגרף (R5) קודם, ואז מצבי ההסבר (R3), המבחן
+        וה-Critic (R4) והשאלה החופשית (R6) — במקביל, כל אחד מוסיף handler משלו
+        ב-<code>chat.py</code> בלי לגעת באחרים.</li>
+    <li><strong>Phase 4 — רוחבי:</strong> קאש היצירה (R10), ה-domain guard (R11) והאבטחה
+        (R12) — בנייה במקביל ל-Phase 3, חיבור בסוף.</li>
+    <li><strong>Phase 5 — המלצות:</strong> R8, אחרי שהליבה מוזגה.</li>
+    <li><strong>טסטים לאורך כל הדרך</strong> — כל PR מגיע עם הטסטים שלו, לא באצ' בסוף.</li>
+  </ol>
+
+  <h2>11. מה במפורש לא ב-v1</h2>
+  <ul>
+    <li>קרולר אוטונומי (מעקב אחרי לינקים, אינדוקס אתרים שלמים) — רק seed + URL בודד של משתמש.</li>
+    <li>מודרציה/הקשחה לקלט URL פתוח — v2.</li>
+    <li>קליטת PDF — נקודת הרחבה מתועדת (ענף חילוץ חדש), לא ממומשת.</li>
+    <li>ריבוי משתמשים/חשבונות אמיתי — מפתח API סטטי אחד (דמו single-tenant).</li>
+    <li>גיימיפיקציה מעבר למעקב השלמה/שליטה.</li>
+    <li><strong>F10 מצב ראיון</strong> — נדחה ל-v2 (התכנון שמור).</li>
+  </ul>
+
+  <h2>12. הגדרת "עובד" (Success Criteria)</h2>
+  <ul>
+    <li>זרימה מלאה בדמו: בחירת נושא ← שלושת מצבי ההסבר ← מבחן ← תשובה שגויה ← הסבר מעוגן
+        עם ציטוט ← הצעת נושא קשור.</li>
+    <li>בחירה חוזרת בנושא שהושלם מציעה "רענון או נושא חדש קשור" — מוכח חי.</li>
+    <li>הדבקת URL של מאמר אמיתי מייצרת נושא עובד תוך ~30 שניות, עם חיווי טעינה וכותרת אוטומטית.</li>
+    <li><code>git clone</code> ← <code>docker compose up</code> ← UI עובד, בלי תיקונים ידניים.</li>
+  </ul>
+
+  <footer>
+    מסמכי הפירוט המלאים: <code>docs/PRD.md</code> (דרישות) · <code>docs/ARCHITECTURE.md</code>
+    (ארכיטקטורה וסכמות) · <code>docs/REQUIREMENTS.md</code> (בעלות קבצים לפי דרישה) ·
+    <code>docs/TASKS.md</code> (משימות לפי שלבים) · <code>docs/he/SUMMARY.md</code> (תקציר בעברית).
+  </footer>
+
+</div>
+</body>
+</html>
