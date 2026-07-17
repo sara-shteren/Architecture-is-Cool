@@ -89,7 +89,8 @@ Recommendation step. Owns the shared `TopicState` and free-text similarity retri
 **Note**: R3 and R4 own their *own* agent files (`mode_agent.py`, `quiz_agent.py`,
 `quiz_critic_agent.py`) — R5 only owns graph wiring (`graph.py`) and the `Retriever` node
 itself. This split lets R3/R4/R5 be developed in parallel against an agreed `TopicState`
-shape (frozen at the start of Phase 2, see TASKS.md) with each node stubbed until wired.
+shape (frozen during infrastructure setup — TASKS.md topic 1) with each node stubbed
+until wired.
 
 ## R6 — Scoped Free-Question Mode (F6)
 
@@ -146,7 +147,7 @@ against a fake generator function.
 - **Depends on**: R0.
 - **Blocks**: nothing structurally, but R3/R4 should call through
   `generation_cache_service` rather than the LLM directly once both exist — coordinate
-  merge order (see TASKS.md Phase 3).
+  merge order (TASKS.md topic 10, integration step last).
 
 ## R11 — Domain-Scoping Guard (ARCHITECTURE §9)
 

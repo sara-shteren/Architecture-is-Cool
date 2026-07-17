@@ -1,283 +1,265 @@
-# TASKS — Architecture-is-Cool
+# משימות פיתוח — Architecture-is-Cool
 
-Organized by requirement (see REQUIREMENTS.md for file ownership and rationale). Tasks
-inside one requirement are sequential; requirements in the same **Phase** can be developed
-in parallel by different people/branches without touching each other's files, as long as
-the noted coordination points are respected.
+מאורגן לפי נושאים. כל נושא פותח ב**דרישה העסקית** (מה צריך לקרות ולמה), ואחריה
+**משימות הפיתוח** במילים — לא שמות קבצים. מיפוי טכני לקבצים ולבעלויות (למי שרוצה לתאם
+עבודה מקבילה) נמצא ב-`REQUIREMENTS.md`. הפירוט המלא של כל התנהגות — ב-`PRD.md`
+ו-`ARCHITECTURE.md`.
 
----
-
-## Phase 0 — Foundation (must land first, blocks everything)
-
-### R0 — Foundation
-- [ ] `app/core/config.py` — Pydantic `Settings`, all env vars from `.env.example`
-- [ ] `.env.example` + `docker-compose.yml` + `Dockerfile`
-- [ ] `app/models/__init__.py` — SQLAlchemy async engine/session setup
-- [ ] `alembic/` — migrations scaffold (empty initial migration)
-- [ ] `app/vector/connection.py` — pgvector session/connection helper (no queries yet)
-- [ ] Core interfaces in `app/core/interfaces.py`: `LLMProvider`, `EmbeddingProvider`,
-      `StorageProvider` (Protocols per ARCHITECTURE.md §4)
-- [ ] Gemini implementations + local-filesystem `StorageProvider` implementation
-- [ ] `app/main.py` — FastAPI app instance, health check route only
-- [ ] Freeze `app/agents/state.py` `TopicState` shape (ARCHITECTURE.md §5) — this is the
-      contract R3/R4/R5 build against; changing it later touches three requirements at once
-
-**Exit criteria**: `docker compose up` boots an empty FastAPI app with a working `/health`
-route and a DB connection. Nothing product-specific yet.
+סדר הנושאים הוא גם סדר עבודה מומלץ: כל נושא מניח שהקודמים לו קיימים.
 
 ---
 
-## Phase 1 — Data & Domain (parallel-safe once Phase 0 lands)
+## 1. הקמת התשתית
 
-### R1 — Ingestion Pipeline
-- [ ] `app/models/source_file.py`, `app/models/chunk.py` + migration
-- [ ] `app/utils/html_to_text.py`
-- [ ] `app/utils/chunking.py` (heading/section-aware, tested for no mid-concept cuts)
-- [ ] `app/services/ingestion_service.py` — fetch → extract → chunk → embed → upsert,
-      content-hash + `pipeline_version` cache check (ARCHITECTURE.md §6.5)
-- [ ] `data/seed/` — curate 15-25 licensing-clean source URLs/files
-- [ ] `scripts/seed_embeddings.py` — one-off run, produces `data/embeddings_seed.json`
-- [ ] `load_seed_into_db()` on startup — loads snapshot if table empty, never recomputes
+**דרישה עסקית:** מפתח שמשכפל את הריפו מריץ פקודה אחת ומקבל סביבה עובדת — בלי התקנות
+ידניות, בלי סודות בקוד, ובלי תלות בספק ענן ספציפי. אותה סביבה בדיוק תרוץ בעתיד בענן.
 
-**Depends on**: R0. **No file overlap with R7.**
+**משימות:**
+- [ ] פרויקט Python עם FastAPI שעולה בקונטיינר, כולל מסד PostgreSQL עם תמיכה וקטורית
+      (pgvector), דרך docker-compose
+- [ ] כל הקונפיגורציה דרך משתני סביבה בלבד, עם קובץ דוגמה שמתעד אילו משתנים צריך
+- [ ] מנגנון מיגרציות למסד (Alembic) מחובר ועובד
+- [ ] ממשקים (Protocols) לשלוש התלויות החיצוניות — מודל שפה, embeddings, אחסון — כך
+      שהחלפת ספק היא שינוי קונפיגורציה, לא שינוי קוד. מימוש ראשון: Gemini + מערכת קבצים
+- [ ] גרסאות "מזויפות" (Fake) של הממשקים האלה לטסטים — דטרמיניסטיות, בלי רשת
+- [ ] הגדרת ה-state המשותף של גרף הסוכנים (TopicState) — מוקפא עכשיו, כי כל עבודת
+      הסוכנים בהמשך בונה מולו
+- [ ] CI בסיסי: לינט + טסטים על כל push, בלי צורך במפתח API אמיתי
 
-### R7 — Progress Tracking
-- [ ] `app/models/user_progress.py` + migration
-- [ ] `app/services/progress_service.py` — get/set status, mastery_score
-- [ ] `app/schemas/progress.py`
-- [ ] `app/api/routes/progress.py` — CRUD-ish endpoints
-
-**Depends on**: R0, R2 (needs `topics` table to FK against — can stub against a not-yet-
-merged `Topic` model type as long as the FK name is agreed, but final migration needs R2
-merged first).
+**גמור כאשר:** `git clone` ואז `docker compose up` מרימים שרת עם endpoint בריאות עובד
+ומסד מחובר, על מכונה נקייה.
 
 ---
 
-## Phase 2 — Topic Domain (sequential gate before Phase 3 fan-out)
+## 2. קליטת ידע (Ingestion)
 
-### R2 — Topic Domain & F1
-- [ ] `app/models/topic.py` + migration (`chunk_range`, `topic_embedding`, plus `status`
-      and `source` columns per ARCHITECTURE.md §6.5 — included now so R1.5 needs no
-      follow-up migration)
-- [ ] `app/services/topic_service.py` — deterministic topic → chunk lookup
-- [ ] `app/schemas/topic.py` — include `status`/`source` in the response schema
-- [ ] `app/api/routes/topics.py` — list/get topic endpoints
+**דרישה עסקית:** המערכת "לומדת" מאמרים: מקבלת כתובת URL, מחלצת את הטקסט, חותכת אותו
+לקטעים הגיוניים (לא באמצע רעיון), והופכת כל קטע לייצוג וקטורי שמאפשר חיפוש סמנטי.
+עיבוד יקר לא רץ פעמיים על אותו תוכן — ואסור לשרוף את מכסת ה-API החינמית על כל הפעלה
+של הסביבה.
 
-**Depends on**: R1. **Blocks R3, R4, R5, R6, R8, R1.5** — this is the sequential gate.
-Land this before starting Phase 3 in earnest (Phase 3 requirements can be
-scaffolded/stubbed earlier against the frozen `TopicState`, but need real `topics` data to
-integration-test).
+**משימות:**
+- [ ] שליפת דף HTML מכתובת וחילוץ טקסט נקי ממנו
+- [ ] חיתוך לקטעים מודע-מבנה: לפי כותרות/סעיפים, בלי לחתוך רעיון באמצע
+- [ ] חישוב embeddings לקטעים ושמירתם במסד הווקטורי
+- [ ] מנגנון מניעת עיבוד כפול: זיהוי תוכן לפי hash + גרסת pipeline — תוכן שכבר עובד
+      מדולג; שינוי מודל embedding או לוגיקת חיתוך מבטל את הקאש אוטומטית
+- [ ] אוצרות קורפוס ההתחלה: 6-10 מאמרים ציבוריים ונקיי-רישיון על דזיין פטרנס וארכיטקטורה
+- [ ] הפרדת seed מפיתוח: סקריפט חד-פעמי שמחשב embeddings לקורפוס ושומר snapshot;
+      עליית השרת טוענת את ה-snapshot אם המסד ריק — ולעולם לא מחשבת מחדש
 
-### R1.5 — User-Submitted URL Ingestion (after R2 lands; parallel-safe vs. all of Phase 3)
-- [ ] `app/utils/title_extraction.py` — heuristic (`<title>` / first `<h1>`) + one-line
-      LLM-summary fallback when the heuristic yields nothing usable
-- [ ] `topic_service.create_topic_from_url(url)` — insert `processing` topic row → content-
-      hash cache check via `ingestion_service` (hit: link existing source_file/chunks) →
-      on miss run the standard pipeline → derive title → `chunk_range` = all chunks,
-      `topic_embedding` = centroid of chunk embeddings → `status='ready'`; any failure →
-      `status='failed'` + short reason (never left `processing`)
-- [ ] `POST /topics/from-url` — inserts the `processing` row, kicks the ingestion off as a
-      FastAPI background task, returns topic id immediately
-- [ ] `GET /topics/{id}` returns `status` (already part of R2's schema) — frontend polls
-      this for the loading state
-- [ ] Basic input sanity (v1-level only, per ARCHITECTURE.md §6.6): http(s) scheme check,
-      ~2 MB content-size cap, fetch timeout
-- [ ] Tests: duplicate-URL cache hit (second submit → `ready` without re-ingestion),
-      bad-URL failure path (`status='failed'`, clear reason), title fallback path
-
-**Depends on**: R1, R2. **Blocks**: none — does not touch R3/R4/R5/R6 files; a `ready`
-user-submitted topic is indistinguishable from a curated one downstream.
+**גמור כאשר:** הרצת הסקריפט על הקורפוס ממלאת את המסד; הרצה שנייה לא קוראת ל-API בכלל;
+הפעלת סביבה רגילה לא צורכת אף קריאת API.
 
 ---
 
-## Phase 3 — Agent Graph & Core Loop (parallel with coordination points)
+## 3. נושאים (Topics)
 
-Before starting: confirm `TopicState` (frozen in Phase 0) and route names
-(`POST /chat/mode`, `POST /chat/quiz`, `POST /chat/ask` for free-text) so R3/R4/R6 don't
-collide inside `chat.py`.
+**דרישה עסקית:** "נושא" הוא יחידת הלמידה — שם קריא (למשל "Strategy Pattern") שמקושר
+לקטעי המקור שלו. בחירת נושא שולפת את הקטעים שלו באופן דטרמיניסטי — בלי חיפוש דמיון,
+בלי הפתעות. לכל נושא יש גם ייצוג וקטורי משלו (לצורך המלצות בהמשך).
 
-### R5 — Retriever Agent & Graph Orchestration
-- [ ] `app/agents/retriever_agent.py` — deterministic topic lookup + similarity-scoped
-      free-text retrieval
-- [ ] `app/services/rag_service.py` — shared retrieval helper used by Retriever + R6
-- [ ] `app/agents/graph.py` — LangGraph wiring: Retriever → Mode Router → Quiz Generator →
-      Quiz Critic → Recommendation step (stub node calls until R3/R4/R8 land, wire for
-      real after)
-- [ ] Per-node timeout + error recovery → "system busy" fallback state (no stack traces)
+**משימות:**
+- [ ] מודל נושא במסד: שם, קישור למקור, טווח הקטעים השייכים לו, embedding של הנושא,
+      וסטטוס (בעיבוד / מוכן / נכשל) — הסטטוס נדרש כבר עכשיו בשביל קליטת URL של משתמש
+- [ ] שירות שמחזיר עבור נושא נתון את קטעי המקור שלו — lookup ישיר לפי טווח, לא similarity
+- [ ] API: רשימת נושאים (עם סטטוס ההתקדמות של המשתמש) + שליפת נושא בודד
 
-**Depends on**: R0, R1, R2. **Blocks R3, R4, R6** for full integration (they can write
-their own agent logic against the frozen `TopicState` in parallel, then wire into
-`graph.py` once R5's skeleton exists).
-
-### R3 — Mode Generation & F2
-- [ ] `app/agents/mode_agent.py` — joke/analogy/code generation, grounded in retrieved
-      chunk(s)
-- [ ] `app/prompts/joke.txt`, `analogy.txt`, `code_junior.txt`, `code_senior.txt`,
-      `code_architect.txt`
-- [ ] `app/api/routes/chat.py` — `POST /chat/mode` handler only (**do not touch other
-      handlers in this file** — R6 and R11 also add handlers/guards here)
-- [ ] Wire into `graph.py`'s Mode Router node (coordinate merge with R5)
-
-**Depends on**: R0, R2, R5 (skeleton). **Shares `chat.py` with R6, R11** — add your handler,
-don't restructure the file.
-
-### R4 — Quiz Generation & Critic Loop
-- [ ] `app/models/quiz_attempt.py` + migration
-- [ ] `app/agents/quiz_agent.py` — question generation grounded in retrieved chunk(s)
-- [ ] `app/agents/quiz_critic_agent.py` — evaluates answer against source chunk, triggers
-      multi-hop retrieval (F5) on demand, `retry_count` guard
-- [ ] `app/prompts/quiz_standard.txt`, `critic_eval.txt`
-- [ ] `app/services/quiz_service.py` — persists `quiz_attempts`
-- [ ] `app/api/routes/chat.py` — `POST /chat/quiz` handler only (coordinate, see R3 note)
-- [ ] Wire into `graph.py`'s Quiz Generator/Critic nodes + conditional retry edge
-      (coordinate merge with R5)
-
-**Depends on**: R0, R2, R5 (skeleton). **Shares `chat.py` with R3, R6, R11.**
-
-### R6 — Scoped Free-Question Mode
-- [ ] `app/api/routes/chat.py` — `POST /chat/ask` handler only (coordinate, see R3 note)
-- [ ] Extend `rag_service.py` with a topic-scope filter parameter (default: current topic;
-      explicit `expand=true` → whole corpus) — **additive parameter, do not restructure
-      the function signature R5 already shipped**
-
-**Depends on**: R5. **Shares `chat.py` and `rag_service.py`** — land after R5's skeleton,
-coordinate the `rag_service.py` diff with whoever touches it last before merge.
+**גמור כאשר:** קריאת API לנושא מחזירה בדיוק את קטעי המקור הנכונים שלו, מוכח בטסט.
 
 ---
 
-## Phase 4 — Cross-Cutting Concerns (parallel, mostly additive)
+## 4. הוספת מאמר על ידי המשתמש (F1.5)
 
-These wrap or gate Phase 3 code but live in their own files — safe to build in parallel
-with Phase 3, merge order only matters for the final integration point noted per task.
+**דרישה עסקית:** משתמש שרוצה ללמוד ממאמר שלא ברשימה מדביק URL. המערכת קולטת אותו חי
+(10-30 שניות, עם חיווי טעינה ברור), נותנת לו שם אוטומטית מתוך התוכן, ומרגע שהוא מוכן —
+הוא נושא לכל דבר: אותם מצבי הסבר, אותו מבחן, אותן המלצות. זה מתווסף לכפתורים הקבועים,
+לא מחליף אותם.
 
-### R10 — Generation Cache
-- [ ] `app/models/generation_cache.py` + migration (schema fixed in ARCHITECTURE.md §6.5
-      — do not redesign, implement as specified)
-- [ ] `app/services/generation_cache_service.py` — `get_or_generate(topic_id, mode, level,
-      prompt_version, generate_fn)`: `COUNT(*) < N=3` → call `generate_fn`, insert row;
-      else → random `SELECT`
-- [ ] Unit tests against a fake `generate_fn` (no LLM needed)
-- [ ] **Integration task (do last, touches R3/R4 files)**: swap direct LLM calls in
-      `mode_agent.py` and `quiz_agent.py` to go through
-      `generation_cache_service.get_or_generate(...)` — small, additive diff once R3/R4
-      are merged
+**משימות:**
+- [ ] endpoint שמקבל URL: יוצר מיד נושא בסטטוס "בעיבוד" ומחזיר מזהה; הקליטה עצמה רצה
+      כמשימת רקע (בלי תשתית תורים — background task פשוט)
+- [ ] הפרונט סוקר (polling) את סטטוס הנושא ומציג טעינה עד שהוא מוכן
+- [ ] שימוש חוזר מלא בצנרת הקליטה מנושא 2 — כולל בדיקת הקאש: URL שכבר נקלט (אפילו על
+      ידי משתמש אחר) הופך לנושא מוכן כמעט מיידית, בלי עיבוד חוזר
+- [ ] גזירת שם אוטומטית: כותרת הדף או ה-H1; אם אין — סיכום שורה מה-LLM
+- [ ] טיפול בכישלון: URL שבור / דף ריק ← סטטוס "נכשל" עם סיבה ברורה למשתמש. אסור
+      שנושא יישאר תקוע ב"בעיבוד"
+- [ ] הגנות בסיסיות בלבד (v1): רק http/https, תקרת גודל ~2MB, timeout לשליפה.
+      מודרציה ומכסות פר-משתמש — v2 במוצהר
 
-**Depends on**: R0. Build the service + tests independently; only the final integration
-step needs R3/R4 merged first.
-
-### R11 — Domain-Scoping Guard
-- [ ] `app/services/domain_guard_service.py` — `is_in_domain()` per ARCHITECTURE.md §9
-- [ ] Unit tests with fake embedding provider (in-domain passes, out-of-domain
-      short-circuits)
-- [ ] **Integration task (touches `chat.py`)**: add as a guard clause at the top of the
-      free-text handler (`POST /chat/ask` from R6) — one `if` statement, not a
-      restructure
-
-**Depends on**: R1 (corpus embeddings must exist to check against).
-
-### R12 — Security & Secrets Hardening
-- [ ] `app/core/security.py` — `X-API-Key` FastAPI dependency
-- [ ] Apply dependency to all routes except `/health` (small edit per route file —
-      coordinate timing so it lands after route files exist, i.e. after Phase 3)
-- [ ] slowapi rate limiting, keyed per API key, matched to Gemini free-tier limits
-- [ ] CORS config (env-driven origin, never `*`)
-- [ ] `.gitignore` audit — confirm `.env`, `*.pem`, `*.key` excluded; `data/seed/` explicitly
-      allowed
-
-**Depends on**: R0. Apply-to-all-routes step should land after Phase 3 routes exist, or be
-re-run as new routes are added.
+**גמור כאשר:** הדבקת מאמר אמיתי מייצרת נושא עובד תוך ~30 שניות עם שם הגיוני; הדבקה
+חוזרת של אותו URL כמעט מיידית; URL שבור מציג שגיאה ברורה.
 
 ---
 
-## Phase 5 — Recommendation (sequential after Phase 3/4; Interview Mode deferred to v2)
+## 5. גרף הסוכנים — השלד (LangGraph)
 
-### R8 — Recommendation Engine
-- [ ] `app/services/recommendation_service.py` — `suggest_related_topic()` exactly as
-      specified in ARCHITECTURE.md §7
-- [ ] Similarity search is a live pgvector query (no precompute — must stay correct as
-      user-submitted topics arrive at runtime, see ARCHITECTURE.md §8 item 2); filter
-      candidates to `status='ready'`
-- [ ] Wire trigger 1 (repeat-click completed topic) into `app/api/routes/topics.py`
-      (coordinate with R2 owner)
-- [ ] Wire trigger 2 (quiz resolved) into `graph.py`'s Recommendation step (coordinate
-      with R5 owner)
-- [ ] Wire trigger 3 (empty-state chat entry) into `chat.py` or a new `app/api/routes/chat.py`
-      entry handler
+**דרישה עסקית:** הזרימה בין הסוכנים (שליפה ← הסבר/מבחן ← הערכה ← המלצה) מנוהלת כגרף
+מפורש עם state משותף — לא סדרת if/else. כשל של ה-LLM (עומס, שגיאת רשת) לא מפיל את
+המערכת ולא מציג stack trace — אלא הודעת "המערכת עמוסה, נסו שוב" נקייה.
 
-**Depends on**: R2, R7.
+**משימות:**
+- [ ] סוכן Retriever: שליפה דטרמיניסטית לפי נושא, או חיפוש דמיון לשאלות חופשיות
+      בגבולות הנושא הנוכחי
+- [ ] הרכבת הגרף: שליפה ← ניתוב מצב ← מחולל מבחן ← מבקר ← המלצה, כולל הקשת החוזרת
+      של המבקר (עם שאר הצמתים כ-stubs עד שנושאים 6-7 ימומשו)
+- [ ] עמידות לכשלי LLM: ניסיונות חוזרים עם backoff בתוך שכבת הספק (הסוכנים לא מודעים
+      לזה), timeout פר-צומת, ומצב fallback נקי אחרי כישלון סופי
 
-### R9 — Interview-Prep Mode — **DEFERRED TO V2, skip for v1 build**
-Not scheduled in any v1 phase. Task list kept here only so v2 can pick it up directly:
-- [ ] `app/schemas/session_profile.py` — `domain`, `language`, `level` (transient, request
-      params only, no new table)
-- [ ] `app/prompts/quiz_interview.txt`
-- [ ] Add `style="interview_question"` parameter to `quiz_agent.py` (additive — coordinate
-      with R4 owner, small diff)
-- [ ] Add profile-embedding anchor option to `recommendation_service.py` (additive —
-      coordinate with R8 owner)
-- [ ] New route or query param on existing chat/topics routes to accept the session profile
-
-**Depends on**: R4, R8 (both must be merged — this is a thin parameterization, not new
-logic).
+**גמור כאשר:** טסט עם ספק מזויף מוכיח שהגרף עובר בין כל הצמתים, שהקשת החוזרת עובדת,
+ושכשל LLM חוזר מסתיים בהודעה נקייה — הכל בלי אף קריאת רשת.
 
 ---
 
-## Phase 6 — Testing & CI (ongoing, not batched at the end)
+## 6. מצבי ההסבר — בדיחה / אנלוגיה / קוד (F2)
 
-### R13 — Testing & CI
-- [ ] `app/core/fakes.py` — `FakeLLMProvider`, `FakeEmbeddingProvider` (build in Phase 0,
-      right after the Protocol interfaces exist)
-- [ ] `.github/workflows/ci.yml` — ruff + pytest on push (build in Phase 0)
-- [ ] Per-requirement test files ship **with** that requirement's PR, not batched:
-  - `tests/test_ingestion.py` (with R1) — cache hit/miss, `pipeline_version` invalidation, chunking
-  - `tests/test_topics.py` (with R2)
-  - `tests/test_url_submission.py` (with R1.5) — duplicate-URL cache hit, failure path,
-    title fallback
-  - `tests/test_progress.py` (with R7)
-  - `tests/test_graph.py` (with R5) — Quiz Critic conditional edge, `retry_count` stop,
-    LLM-failure fallback
-  - `tests/test_mode_agent.py` (with R3)
-  - `tests/test_quiz.py` (with R4)
-  - `tests/test_rag_service.py` (with R6) — scope filter
-  - `tests/test_generation_cache.py` (with R10)
-  - `tests/test_domain_guard.py` (with R11)
-  - `tests/test_recommendation.py` (with R8) — exclusion filter logic
-  - `tests/test_interview_mode.py` (with R9)
-  - `tests/test_routes_smoke.py` (`TestClient`, schema validation, error codes — grows
-    incrementally as routes land)
+**דרישה עסקית:** לכל נושא, המשתמש בוחר איך שהרעיון "ייכנס לו לראש": בדיחה/סיפור,
+אנלוגיה, או דוגמת קוד ברמה שבחר (ג'וניור/סניור/ארכיטקט). כל השלושה מעוגנים באותם קטעי
+מקור — כדי שלא יסתרו זה את זה.
 
-**Depends on**: R0 (fakes need the Protocol interfaces). Not a separate phase in practice —
-listed last only to name the CI job; each checkbox above is actually done inside its
-sibling requirement's PR.
+**משימות:**
+- [ ] סוכן שמייצר את שלושת סוגי ההסבר מתוך הקטעים שנשלפו, לפי המצב שנבחר
+- [ ] תבניות פרומפט נפרדות (מחוץ לקוד) לכל מצב ולכל רמת קוד
+- [ ] endpoint צ'אט למצבי ההסבר, מחובר לגרף
+
+**גמור כאשר:** בחירת נושא + מצב מחזירה הסבר שמבוסס בבירור על תוכן המקור (לא ידע כללי),
+ושלושת המצבים עקביים זה עם זה.
 
 ---
 
-## Phase 7 — Secondary / Optional (schedule independently, does not block v1 demo)
+## 7. המבחן והמבקר — לב המוצר (F3-F5)
 
-### R14 — Email Re-engagement Hook (F9)
-- [ ] `app/services/email_service.py`
-- [ ] `scripts/send_digest.py` — scheduled entry point
-- [ ] Trigger endpoint if needed (`app/api/routes/email.py`)
+**דרישה עסקית:** המערכת שואלת שאלה שמעוגנת בקטע המקור. המשתמש עונה בטקסט חופשי.
+סוכן מבקר (Critic) מעריך את התשובה **מול קטע המקור** — לא מול ידע כללי — ומסביר מה היה
+נכון ומה לא, עם ציטוט. תשובה שגויה מקבלת הסבר וניסיון נוסף (עם עצירה אחרי מספר
+ניסיונות). תשובה נכונה יכולה להציף חומר קשור משאר הקורפוס.
 
-**Depends on**: R2, R4. Explicitly out of the critical path — PRD.md frames this as
-secondary; do not let it block Phase 3-5 merges.
+**משימות:**
+- [ ] מחולל שאלות מעוגן בקטעי המקור של הנושא הנוכחי
+- [ ] סוכן מבקר שמשווה את תשובת המשתמש לקטע המקור ומחזיר פסק (נכון / שגוי / לא ברור)
+      + הסבר + ציטוט
+- [ ] **כלל קריטי:** תשובה נכונה-אך-לא-במקור מקבלת פסק "לא ברור" עם תשובה כנה ("המקור
+      לא מתייחס לזה — הנה מה שהוא כן אומר") — לעולם לא "שגוי" כוזב. מפתחים מנוסים עונים
+      מניסיון מעבר למאמר; פסילה שלהם תהרוס את האמון במוצר
+- [ ] לולאת retry עם מונה עצירה — בלי לולאות אינסופיות
+- [ ] הצפת רפרנסים קשורים מהקורפוס הרחב כשהמבחן נפתר (multi-hop)
+- [ ] תיעוד כל ניסיון מבחן במסד (שאלה, תשובה, פסק, מספר ניסיונות) לצורכי מעקב
+
+**גמור כאשר:** הזרימה המלאה עובדת חי: שאלה ← תשובה שגויה ← הסבר עם ציטוט ← ניסיון נוסף
+← תשובה נכונה ← רפרנסים; ותשובה נכונה שאינה במקור מקבלת "לא ברור" הוגן ולא פסילה.
 
 ---
 
-## Suggested execution order for a solo/small-team build
+## 8. שאלות חופשיות בתוך נושא (F6)
 
-1. **Phase 0** solo, sequential (foundation must be right before anything else starts).
-2. **Phase 1**: R1 and R7 in parallel (different files, R7 only needs R2's *shape* agreed,
-   not merged — stub the FK).
-3. **Phase 2**: R2 alone — short, sequential gate. R1.5 (URL submission) any time after
-   R2 lands, in parallel with Phase 3 (no shared files with R3-R6).
-4. **Phase 3**: R5 skeleton first (even a stub graph unblocks R3/R4/R6 to build against
-   `TopicState`), then R3/R4/R6 in parallel with the `chat.py`/`rag_service.py`
-   coordination notes above.
-5. **Phase 4**: R10/R11/R12 in parallel with Phase 3 — they're additive and mostly
-   independent; only their "integration task" checkboxes wait on Phase 3 merges.
-6. **Phase 5**: R8 — needs Phase 3 fully merged. (R9 deferred to v2, skip.)
-7. **Phase 6**: continuous, not a separate step — each PR carries its own tests.
-8. **Phase 7**: anytime, does not gate the demo.
+**דרישה עסקית:** באמצע למידת נושא, המשתמש שואל שאלה חופשית ("מה ההבדל בין זה ל-X?").
+התשובה נשלפת מהקורפוס — מסוננת כברירת מחדל לנושא הנוכחי, עם אפשרות מפורשת להרחיב לכל
+הקורפוס.
 
-**v1 scope excludes R9 (Interview-Prep Mode)** — deferred to v2, see PRD.md §6.
+**משימות:**
+- [ ] endpoint לשאלה חופשית: embedding לשאלה ← חיפוש דמיון מסונן לנושא הנוכחי ← תשובה
+      מעוגנת עם ציון מקורות
+- [ ] פרמטר "הרחב" שפותח את החיפוש לכל הקורפוס לפי בקשת המשתמש
+
+**גמור כאשר:** שאלה על הנושא הנוכחי נענית מקטעי הנושא בלבד; עם "הרחב" — מקטעים מכל
+הקורפוס; בשני המקרים עם ציון מקור.
+
+---
+
+## 9. התקדמות והמלצות (F7-F8)
+
+**דרישה עסקית:** המערכת זוכרת מה המשתמש סיים ובאיזו רמה — ומשתמשת בזה לשתי מטרות:
+(א) נושא שהושלם ונבחר שוב מציע "רענון או משהו חדש קשור"; (ב) בסיום נושא או בכניסה
+בלי בחירה — מוצע הנושא הקשור ביותר שעוד לא נלמד. חשוב: מעקב ההתקדמות הוא רשומות SQL
+פשוטות ("הושלם? כן/לא") — ההמלצות הן היחידות שמשתמשות בדמיון סמנטי. לא לערבב.
+
+**משימות:**
+- [ ] מעקב התקדמות: סטטוס השלמה + ציון שליטה פר משתמש ונושא, API לקריאה ועדכון
+- [ ] פונקציית המלצה אחת: מקבלת נושא עוגן, מחפשת נושאים דומים (שאילתת pgvector חיה —
+      לא חישוב מראש, כדי שנושאים שמשתמשים הוסיפו ייכנסו למאגר), מסננת מה שכבר הושלם
+      ומה שלא בסטטוס "מוכן", ומחזירה את המועמד הראשון
+- [ ] חיבור לשלוש נקודות ההפעלה: לחיצה חוזרת על נושא שהושלם, סיום מבחן, וכניסה לצ'אט
+      בלי נושא — כולן קוראות לאותה פונקציה עם עוגן שונה
+
+**גמור כאשר:** שלושת התרחישים מציעים נושא רלוונטי שטרם נלמד, ולחיצה חוזרת על נושא
+שהושלם מציגה בבירור "רענון או חדש" — מוכח חי.
+
+---
+
+## 10. חיסכון בעלויות — קאש היצירה
+
+**דרישה עסקית:** דמו של ~100 משתמשים צריך לעלות פחות מדולר. העיקרון: תוכן נוצר חי
+בפעם הראשונה שמישהו מבקש שילוב (נושא × מצב × רמה) ונשמר; מבקרים הבאים מקבלים גרסה
+שמורה. כדי שזה לא ירגיש "מוקלט", נשמרות עד 3 גרסאות לכל שילוב ונבחרת אחת אקראית.
+הערכת המבקר לעולם לא נשמרת בקאש — כל תשובה ייחודית.
+
+**משימות:**
+- [ ] טבלת קאש לתוצרי יצירה לפי (נושא, מצב, רמה, גרסת פרומפט) — הסכימה כבר סגורה
+      בארכיטקטורה, לממש כמו שכתוב
+- [ ] לוגיקת קריאה: פחות מ-3 גרסאות לשילוב ← יצירה חדשה ושמירה; 3 ← בחירה אקראית
+      מהקיימות בלי LLM
+- [ ] ביטול קאש טבעי בהחלפת גרסת פרומפט
+- [ ] חיבור מצבי ההסבר ומחולל השאלות לעבור דרך הקאש (אחרי שנושאים 6-7 עובדים)
+
+**גמור כאשר:** בקשה רביעית לאותו שילוב לא מייצרת קריאת LLM (מוכח בטסט עם ספק מזויף),
+ושתי בקשות עוקבות מחזירות גרסאות שונות.
+
+---
+
+## 11. אבטחה ושמירת המכסה
+
+**דרישה עסקית:** המערכת חשופה לאינטרנט ביום הדמו. צריך למנוע: שימוש אנונימי, השתלטות
+של משתמש אחד על כל המכסה, וניצול הצ'אט כ"פרוקסי חינם" ל-LLM כללי (שאלות שלא קשורות
+לתחום). ואפס סודות בקוד.
+
+**משימות:**
+- [ ] מפתח API סטטי ב-header, נבדק על כל ה-routes חוץ מבדיקת הבריאות
+- [ ] הגבלת קצב פר-מפתח/session (לא רק גלובלית), מכוונת למכסת ספק ה-LLM
+- [ ] CORS מוגבל לדומיין הפרונט בלבד
+- [ ] שומר-תחום: לפני שהודעת טקסט חופשי מגיעה ל-LLM, בדיקת דמיון סמנטי מול קורפוס
+      הנושאים; מתחת לסף ← תשובה מנומסת "העוזר עונה רק על ארכיטקטורה ודזיין פטרנס",
+      בעלות של embedding אחד בלבד. חל רק על קלט חופשי — לא על לחיצות כפתורים
+- [ ] כיול הסף אמפירית: סקריפט שמריץ ~20-30 שאלות בתחום ומחוצה לו ומראה את התפלגות
+      הציונים; הערך נשמר בקונפיגורציה, לא בקוד
+- [ ] היגיינת סודות: הכל דרך קונפיגורציית env מרכזית, gitignore מהקומיט הראשון, לוגים
+      בלי תוכן פרומפטים ובלי מפתחות
+
+**גמור כאשר:** בקשה בלי מפתח נדחית; שאלה מחוץ לתחום לא מגיעה ל-LLM (מוכח בטסט); אין
+אף סוד ב-git.
+
+---
+
+## 12. חוויית הצ'אט — UI והתממשקות
+
+**דרישה עסקית:** ממשק צ'אט נקי (Next.js) שמרכז את כל היכולות: כפתורי נושאים (עם חיווי
+"הושלם"), שדה הדבקת URL עם מצב טעינה, בחירת מצב הסבר ורמה, זרימת מבחן עם משוב ברור,
+שאלה חופשית, והצגת ההמלצה לנושא הבא.
+
+**משימות:**
+- [ ] מסך ראשי: רשימת נושאים ככפתורים + סטטוס התקדמות + שדה "הוסף מאמר מ-URL"
+- [ ] מצב טעינה לקליטת URL (polling על סטטוס הנושא) כולל הצגת כישלון ברור
+- [ ] חלון שיחה: בחירת מצב (בדיחה/אנלוגיה/קוד+רמה), זרימת מבחן (שאלה ← תשובה ← פסק
+      עם ציטוט ← retry), שאלה חופשית עם כפתור "הרחב לכל הקורפוס"
+- [ ] הצגת הצעת "הנושא הבא" בשלוש נקודות ההפעלה
+- [ ] טיפול במצבי שגיאה: "המערכת עמוסה", נושא בעיבוד, נושא שנכשל
+
+**גמור כאשר:** כל תרחישי ההצלחה של ה-PRD ניתנים להדגמה מהדפדפן בלבד, בלי Postman.
+
+---
+
+## 13. משני (לא חוסם שום דבר)
+
+**מייל תזכורת (F9):** טיזר קצר + שאלת מבחן אחת מנושא שנלמד לאחרונה, עם קישור חזרה
+לצ'אט. לבנות רק אחרי שהכל למעלה עובד; לא נכנס למסלול הקריטי של הדמו.
+
+**נדחה ל-v2 בהחלטה מפורשת:** מצב הכנה לראיון (F10) — התכנון שמור בארכיטקטורה §7.5;
+מודרציה והקשחה לקלט URL פתוח; קליטת PDF; קרולר.
+
+---
+
+## עיקרון רוחבי: טסטים עם כל נושא
+
+כל נושא נמסר עם הטסטים שלו — לא באצ' בסוף. הכלל: הלוגיקה המעניינת נבדקת בלי LLM ובלי
+רשת, באמצעות הספקים המזויפים מנושא 1. מה שחייב בדיקה אנושית (איכות בדיחות, הוגנות
+המבקר) נבדק ידנית מול צ'ק-ליסט תרחישי ה-PRD.
