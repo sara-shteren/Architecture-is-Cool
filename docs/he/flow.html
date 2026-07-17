@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Architecture-is-Cool — תרשימי זרימה</title>
+<style>
+  :root {
+    --bg: #fdfcfa;
+    --fg: #3a3550;
+    --muted: #7a7590;
+    --card-bg: #ffffff;
+    --border: #eae6f0;
+
+    /* pastel palette */
+    --lav-fill: #e9e3f8;  --lav-border: #9c8fd4;   /* process */
+    --peach-fill: #ffe9d9; --peach-border: #e0995f; /* decision */
+    --mint-fill: #dcf5e7;  --mint-border: #5fb98c;  /* success / output */
+    --pink-fill: #fbdde4;  --pink-border: #d97a94;  /* error / critic */
+    --blue-fill: #ddebf9;  --blue-border: #6f9fd0;  /* cache / data */
+    --butter-fill: #fdf3cf; --butter-border: #c9a94e; /* LLM call ($) */
+
+    --accent: #8d7fd0;
+    --accent-soft: #efeaf9;
+  }
+  :root[data-theme="dark"] {
+    --bg: #17151f;
+    --fg: #e9e6f2;
+    --muted: #9d97b3;
+    --card-bg: #1f1c2a;
+    --border: #322e42;
+
+    --lav-fill: #2d2745;  --lav-border: #a99cdd;
+    --peach-fill: #3a2c1e; --peach-border: #dfa16a;
+    --mint-fill: #1c3529;  --mint-border: #6fcf9b;
+    --pink-fill: #3a222a;  --pink-border: #e08ca4;
+    --blue-fill: #1e2c3d;  --blue-border: #82aedb;
+    --butter-fill: #363019; --butter-border: #d4b45a;
+
+    --accent: #a99cdd;
+    --accent-soft: #2b2542;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17151f;
+      --fg: #e9e6f2;
+      --muted: #9d97b3;
+      --card-bg: #1f1c2a;
+      --border: #322e42;
+
+      --lav-fill: #2d2745;  --lav-border: #a99cdd;
+      --peach-fill: #3a2c1e; --peach-border: #dfa16a;
+      --mint-fill: #1c3529;  --mint-border: #6fcf9b;
+      --pink-fill: #3a222a;  --pink-border: #e08ca4;
+      --blue-fill: #1e2c3d;  --blue-border: #82aedb;
+      --butter-fill: #363019; --butter-border: #d4b45a;
+
+      --accent: #a99cdd;
+      --accent-soft: #2b2542;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", "Rubik", Arial, sans-serif;
+    line-height: 1.7;
+  }
+  .page { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
+  header.hero { margin-bottom: 36px; }
+  .eyebrow {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+  }
+  h1 { font-size: 2rem; margin: 8px 0 4px; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; max-width: 660px; }
+  h2 {
+    font-size: 1.35rem;
+    margin-top: 56px;
+    margin-bottom: 8px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+  h2 .tnum {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 3px 10px;
+    margin-inline-start: 10px;
+    vertical-align: 3px;
+    white-space: nowrap;
+  }
+  p { margin: 10px 0; }
+  code {
+    background: var(--accent-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    direction: ltr;
+    display: inline-block;
+  }
+  .note {
+    border-inline-start: 4px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 0.95rem;
+  }
+
+  /* legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin: 20px 0 4px;
+    font-size: 0.88rem;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+  .chip { width: 20px; height: 14px; border-radius: 4px; border: 1.5px solid; flex: none; }
+  .chip.lav    { background: var(--lav-fill);    border-color: var(--lav-border); }
+  .chip.peach  { background: var(--peach-fill);  border-color: var(--peach-border); }
+  .chip.mint   { background: var(--mint-fill);   border-color: var(--mint-border); }
+  .chip.pink   { background: var(--pink-fill);   border-color: var(--pink-border); }
+  .chip.blue   { background: var(--blue-fill);   border-color: var(--blue-border); }
+  .chip.butter { background: var(--butter-fill); border-color: var(--butter-border); }
+
+  /* diagrams */
+  .diagram-wrap {
+    overflow-x: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin: 18px 0;
+  }
+  .diagram { min-width: 660px; }
+  svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+  .n-proc   { fill: var(--lav-fill);    stroke: var(--lav-border);    stroke-width: 1.6; }
+  .n-dec    { fill: var(--peach-fill);  stroke: var(--peach-border);  stroke-width: 1.6; }
+  .n-ok     { fill: var(--mint-fill);   stroke: var(--mint-border);   stroke-width: 1.6; }
+  .n-err    { fill: var(--pink-fill);   stroke: var(--pink-border);   stroke-width: 1.6; }
+  .n-cache  { fill: var(--blue-fill);   stroke: var(--blue-border);   stroke-width: 1.6; }
+  .n-llm    { fill: var(--butter-fill); stroke: var(--butter-border); stroke-width: 1.6; }
+
+  .t  { fill: var(--fg);    font-size: 13px;   font-family: inherit; text-anchor: middle; font-weight: 600; }
+  .ts { fill: var(--muted); font-size: 10.5px; font-family: inherit; text-anchor: middle; }
+  .edge  { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+  .elab  { fill: var(--muted); font-size: 10.5px; font-family: inherit; text-anchor: middle; }
+  marker path { fill: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.93rem; }
+  th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.83rem; }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow">תרשימי זרימה למפתחים</div>
+    <h1>Architecture-is-Cool — איך הכל זורם</h1>
+    <p class="subtitle">
+      כל תרשים ממופה לנושא המשימות שמממש אותו (T1-T13 מתוך <code>TASKS.md</code>).
+      גרסה אנגלית (Mermaid, נרנדרת ב-GitHub): <code>docs/FLOW.md</code>.
+    </p>
+    <div class="legend">
+      <span><i class="chip lav"></i> תהליך / פעולה</span>
+      <span><i class="chip peach"></i> החלטה</span>
+      <span><i class="chip mint"></i> הצלחה / פלט</span>
+      <span><i class="chip pink"></i> שגיאה / Critic</span>
+      <span><i class="chip blue"></i> קאש / דאטה</span>
+      <span><i class="chip butter"></i> קריאת LLM (עולה כסף)</span>
+    </div>
+  </header>
+
+  <h2>1. מסע המשתמש — מקצה לקצה<span class="tnum">T3 · T4 · T6 · T7 · T9 · T12</span></h2>
+  <p>מה המשתמש חווה: מכניסה לצ'אט ועד הצעת הנושא הבא.</p>
+  <div class="diagram-wrap"><div class="diagram">
+    <svg viewBox="0 0 780 890" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"/></marker></defs>
+
+      <rect x="300" y="10" width="180" height="44" rx="22" class="n-proc"/>
+      <text x="390" y="30" class="t">המשתמש נכנס לצ'אט</text>
+      <text x="390" y="46" class="ts">Next.js UI</text>
+
+      <!-- three entry buttons -->
+      <rect x="560" y="100" width="190" height="52" rx="10" class="n-proc"/>
+      <text x="655" y="122" class="t">לחיצה על כפתור נושא</text>
+      <text x="655" y="138" class="ts">רשימה אוצרת (seed)</text>
+
+      <rect x="295" y="100" width="190" height="52" rx="10" class="n-proc"/>
+      <text x="390" y="122" class="t">🎲 הפתע אותי בחומר מעניין</text>
+      <text x="390" y="138" class="ts">כפתור — המלצה לפי מה שכבר נלמד</text>
+
+      <rect x="30" y="100" width="190" height="52" rx="10" class="n-proc"/>
+      <text x="125" y="122" class="t">הדבקת URL של מאמר</text>
+      <text x="125" y="138" class="ts">קליטה חיה ~10-30 שנ' (תרשים 4)</text>
+
+      <path d="M440,54 L620,100" class="edge" marker-end="url(#a1)"/>
+      <path d="M390,54 L390,100" class="edge" marker-end="url(#a1)"/>
+      <path d="M340,54 L160,100" class="edge" marker-end="url(#a1)"/>
+
+      <!-- converge -->
+      <rect x="300" y="200" width="180" height="46" rx="10" class="n-ok"/>
+      <text x="390" y="220" class="t">נושא נבחר (ready)</text>
+      <text x="390" y="236" class="ts">שליפת קטעי המקור — דטרמיניסטי</text>
+
+      <path d="M655,152 C655,185 480,195 470,205" class="edge" marker-end="url(#a1)"/>
+      <path d="M390,152 L390,200" class="edge" marker-end="url(#a1)"/>
+      <path d="M125,152 C125,185 300,195 310,205" class="edge" marker-end="url(#a1)"/>
+
+      <!-- completed? decision, now wired into the flow -->
+      <rect x="310" y="286" width="160" height="46" rx="10" class="n-dec"/>
+      <text x="390" y="306" class="t">כבר הושלם?</text>
+      <text x="390" y="322" class="ts">בדיקה מול user_progress</text>
+      <path d="M390,246 L390,286" class="edge" marker-end="url(#a1)"/>
+
+      <rect x="560" y="286" width="200" height="52" rx="10" class="n-proc"/>
+      <text x="660" y="307" class="t">רענון או נושא חדש קשור</text>
+      <text x="660" y="324" class="ts">המשתמש בוחר</text>
+      <path d="M470,309 L560,309" class="edge" marker-end="url(#a1)"/>
+      <text x="515" y="300" class="elab">כן</text>
+      <path d="M660,338 C660,398 510,401 482,402" class="edge" marker-end="url(#a1)"/>
+
+      <!-- mode choice -->
+      <rect x="300" y="380" width="180" height="46" rx="10" class="n-dec"/>
+      <text x="390" y="400" class="t">בחירת מצב</text>
+      <text x="390" y="416" class="ts">בדיחה / אנלוגיה / קוד / מבחן</text>
+      <path d="M390,332 L390,380" class="edge" marker-end="url(#a1)"/>
+      <text x="405" y="360" class="elab">לא</text>
+
+      <!-- explanation branch -->
+      <rect x="40" y="470" width="210" height="52" rx="10" class="n-llm"/>
+      <text x="145" y="491" class="t">הסבר מעוגן במקור</text>
+      <text x="145" y="508" class="ts">בדיחה / אנלוגיה / קוד לפי רמה (דרך קאש)</text>
+      <path d="M330,426 L200,470" class="edge" marker-end="url(#a1)"/>
+      <text x="235" y="450" class="elab">הסבר</text>
+      <path d="M250,485 C300,470 330,450 352,428" class="edge" marker-end="url(#a1)"/>
+
+      <!-- free question, wired -->
+      <rect x="40" y="560" width="210" height="52" rx="10" class="n-proc"/>
+      <text x="145" y="581" class="t">שאלה חופשית באמצע</text>
+      <text x="145" y="598" class="ts">מסונן לנושא (או "הרחב לקורפוס")</text>
+      <path d="M145,522 L145,560" class="edge" marker-end="url(#a1)"/>
+      <text x="185" y="545" class="elab">בכל שלב</text>
+      <path d="M40,586 C15,586 15,405 300,403" class="edge" marker-end="url(#a1)"/>
+      <text x="28" y="490" class="elab" transform="rotate(-90 28 490)">חוזרים לבחירת מצב</text>
+
+      <!-- quiz branch -->
+      <rect x="480" y="470" width="200" height="46" rx="10" class="n-llm"/>
+      <text x="580" y="490" class="t">שאלת מבחן</text>
+      <text x="580" y="506" class="ts">מעוגנת בקטע המקור (דרך קאש)</text>
+      <path d="M450,426 L560,470" class="edge" marker-end="url(#a1)"/>
+      <text x="525" y="450" class="elab">מבחן</text>
+
+      <rect x="480" y="555" width="200" height="42" rx="10" class="n-proc"/>
+      <text x="580" y="581" class="t">המשתמש עונה בטקסט חופשי</text>
+      <path d="M580,516 L580,555" class="edge" marker-end="url(#a1)"/>
+
+      <rect x="460" y="640" width="240" height="56" rx="10" class="n-err"/>
+      <text x="580" y="662" class="t">Quiz Critic — הערכה מול המקור</text>
+      <text x="580" y="680" class="ts">חי תמיד, לעולם לא בקאש · נכון / שגוי / לא ברור</text>
+      <path d="M580,597 L580,640" class="edge" marker-end="url(#a1)"/>
+
+      <!-- retry loop -->
+      <path d="M700,668 C 760,668 760,490 682,492" class="edge" marker-end="url(#a1)"/>
+      <text x="748" y="575" class="elab" transform="rotate(90 748 575)">שגוי/לא ברור ← הסבר + ציטוט + ניסיון נוסף</text>
+
+      <rect x="480" y="736" width="200" height="46" rx="10" class="n-proc"/>
+      <text x="580" y="756" class="t">רפרנסים קשורים</text>
+      <text x="580" y="772" class="ts">מכל הקורפוס (multi-hop, אופציונלי)</text>
+      <path d="M580,696 L580,736" class="edge" marker-end="url(#a1)"/>
+      <text x="615" y="720" class="elab">נכון</text>
+
+      <rect x="480" y="822" width="200" height="42" rx="10" class="n-cache"/>
+      <text x="580" y="840" class="t">סימון הושלם + ציון שליטה</text>
+      <text x="580" y="856" class="ts">user_progress — SQL רגיל</text>
+      <path d="M580,782 L580,822" class="edge" marker-end="url(#a1)"/>
+
+      <rect x="150" y="822" width="220" height="52" rx="10" class="n-ok"/>
+      <text x="260" y="843" class="t">המלצת הנושא הבא</text>
+      <text x="260" y="860" class="ts">דומה סמנטית, טרם נלמד, status=ready</text>
+      <path d="M480,845 L370,845" class="edge" marker-end="url(#a1)"/>
+      <path d="M150,840 C 6,828 6,215 300,220" class="edge" marker-end="url(#a1)"/>
+      <text x="14" y="700" class="elab" transform="rotate(-90 14 700)">נושא חדש נבחר ← חוזרים ללולאה</text>
+    </svg>
+  </div></div>
+
+  <h2>2. נתיב הבקשה בשכבות — Modular Monolith<span class="tnum">T1 · T12</span></h2>
+  <p>כל בקשה עוברת בשרשרת חד-כיוונית. <code>routes</code> בלי לוגיקה, <code>agents</code> בלי גישת DB ישירה.</p>
+  <div class="diagram-wrap"><div class="diagram">
+    <svg viewBox="0 0 860 240" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"/></marker></defs>
+
+      <rect x="710" y="90" width="130" height="52" rx="10" class="n-proc"/>
+      <text x="775" y="112" class="t">Next.js UI</text>
+      <text x="775" y="128" class="ts">צ'אט + כפתורים</text>
+
+      <rect x="530" y="90" width="140" height="52" rx="10" class="n-proc"/>
+      <text x="600" y="112" class="t">api/routes</text>
+      <text x="600" y="128" class="ts">HTTP בלבד</text>
+
+      <rect x="320" y="90" width="160" height="52" rx="10" class="n-proc"/>
+      <text x="400" y="112" class="t">services</text>
+      <text x="400" y="128" class="ts">rag · ingestion · cache · guard</text>
+
+      <rect x="330" y="10" width="150" height="50" rx="10" class="n-llm"/>
+      <text x="405" y="31" class="t">agents (LangGraph)</text>
+      <text x="405" y="47" class="ts">Retriever ← Router ← Critic</text>
+
+      <rect x="90" y="90" width="160" height="52" rx="10" class="n-cache"/>
+      <text x="170" y="112" class="t">vector / DB</text>
+      <text x="170" y="128" class="ts">Postgres + pgvector</text>
+
+      <rect x="90" y="170" width="160" height="52" rx="10" class="n-llm"/>
+      <text x="170" y="192" class="t">LLM / Embeddings</text>
+      <text x="170" y="208" class="ts">Gemini מאחורי ממשק Provider</text>
+
+      <path d="M710,116 L670,116" class="edge" marker-end="url(#a2)"/>
+      <path d="M530,116 L480,116" class="edge" marker-end="url(#a2)"/>
+      <path d="M560,90 C 540,45 500,35 480,35" class="edge" marker-end="url(#a2)"/>
+      <path d="M330,45 C 300,55 300,80 330,92" class="edge" marker-end="url(#a2)"/>
+      <path d="M320,116 L250,116" class="edge" marker-end="url(#a2)"/>
+      <path d="M340,142 C 300,175 280,190 250,193" class="edge" marker-end="url(#a2)"/>
+      <text x="760" y="230" class="ts" text-anchor="end">החלפת ספק LLM = שינוי config, לא קוד</text>
+    </svg>
+  </div></div>
+
+  <h2>3. גרף הסוכנים — לולאת הליבה<span class="tnum">T5 · T6 · T7 · T9</span></h2>
+  <p>מכונת מצבים מפורשת (LangGraph) עם <code>TopicState</code> משותף בין הצמתים.</p>
+  <div class="diagram-wrap"><div class="diagram">
+    <svg viewBox="0 0 760 600" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"/></marker></defs>
+
+      <rect x="290" y="10" width="180" height="46" rx="23" class="n-cache"/>
+      <text x="380" y="30" class="t">TopicState נכנס</text>
+      <text x="380" y="46" class="ts">נושא, מצב, רמה, תשובה...</text>
+
+      <rect x="280" y="96" width="200" height="52" rx="10" class="n-proc"/>
+      <text x="380" y="117" class="t">Retriever</text>
+      <text x="380" y="134" class="ts">נושא←קטעים (ישיר) או חיפוש דמיון מסונן</text>
+      <path d="M380,56 L380,96" class="edge" marker-end="url(#a3)"/>
+
+      <rect x="300" y="188" width="160" height="46" rx="10" class="n-dec"/>
+      <text x="380" y="208" class="t">Mode Router</text>
+      <text x="380" y="224" class="ts">לפי בחירת המשתמש</text>
+      <path d="M380,148 L380,188" class="edge" marker-end="url(#a3)"/>
+
+      <rect x="40" y="280" width="220" height="56" rx="10" class="n-llm"/>
+      <text x="150" y="302" class="t">Mode Agent</text>
+      <text x="150" y="320" class="ts">בדיחה / אנלוגיה / קוד — דרך קאש היצירה</text>
+      <path d="M320,234 L200,280" class="edge" marker-end="url(#a3)"/>
+
+      <rect x="60" y="380" width="180" height="42" rx="21" class="n-ok"/>
+      <text x="150" y="406" class="t">תשובה + מקורות</text>
+      <path d="M150,336 L150,380" class="edge" marker-end="url(#a3)"/>
+
+      <rect x="480" y="280" width="220" height="56" rx="10" class="n-llm"/>
+      <text x="590" y="302" class="t">Quiz Generator</text>
+      <text x="590" y="320" class="ts">שאלה מעוגנת בקטע — דרך קאש היצירה</text>
+      <path d="M440,234 L560,280" class="edge" marker-end="url(#a3)"/>
+      <text x="510" y="258" class="elab">מבחן</text>
+
+      <rect x="470" y="386" width="240" height="60" rx="10" class="n-err"/>
+      <text x="590" y="409" class="t">Quiz Critic</text>
+      <text x="590" y="427" class="ts">חי תמיד · מול קטע המקור · retry_count guard</text>
+      <path d="M590,336 L590,386" class="edge" marker-end="url(#a3)"/>
+
+      <path d="M470,416 C 400,416 400,310 478,306" class="edge" marker-end="url(#a3)"/>
+      <text x="410" y="368" class="elab" transform="rotate(-90 410 368)">שגוי/לא ברור ← עוד ניסיון</text>
+
+      <rect x="480" y="486" width="220" height="52" rx="10" class="n-ok"/>
+      <text x="590" y="507" class="t">Recommendation</text>
+      <text x="590" y="524" class="ts">suggest_related_topic()</text>
+      <path d="M590,446 L590,486" class="edge" marker-end="url(#a3)"/>
+      <text x="640" y="468" class="elab">נפתר / מוצו הניסיונות</text>
+
+      <rect x="130" y="486" width="230" height="52" rx="10" class="n-err"/>
+      <text x="245" y="507" class="t">כשל LLM (429/5xx)</text>
+      <text x="245" y="524" class="ts">retry+backoff בשכבת הספק ← "המערכת עמוסה"</text>
+      <path d="M360,505 L480,505" class="edge" stroke-dasharray="5,4"/>
+    </svg>
+  </div></div>
+  <div class="note">
+    <strong>כלל קריטי ל-Critic:</strong> תשובה נכונה שהמקור לא מכסה ← פסק
+    <code>unclear</code> עם "המקור לא מתייחס לזה" — לעולם לא <code>incorrect</code> כוזב.
+  </div>
+
+  <h2>4. קליטת URL של משתמש (F1.5)<span class="tnum">T2 · T4</span></h2>
+  <p>אותה צנרת כמו קורפוס ההתחלה — רק הטריגר שונה. נושא לעולם לא נשאר תקוע ב"בעיבוד".</p>
+  <div class="diagram-wrap"><div class="diagram">
+    <svg viewBox="0 0 780 700" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"/></marker></defs>
+
+      <rect x="290" y="10" width="200" height="42" rx="21" class="n-proc"/>
+      <text x="390" y="36" class="t">POST /topics/from-url</text>
+
+      <rect x="250" y="92" width="280" height="56" rx="10" class="n-cache"/>
+      <text x="390" y="114" class="t">יצירת נושא: status='processing'</text>
+      <text x="390" y="132" class="ts">מזהה חוזר מיד · הקליטה רצה כ-background task</text>
+      <path d="M390,52 L390,92" class="edge" marker-end="url(#a4)"/>
+
+      <rect x="580" y="92" width="180" height="56" rx="10" class="n-proc"/>
+      <text x="670" y="114" class="t">הפרונט עושה polling</text>
+      <text x="670" y="132" class="ts">GET /topics/{id} ← חיווי טעינה</text>
+      <path d="M530,120 L580,120" class="edge" stroke-dasharray="5,4"/>
+
+      <rect x="290" y="192" width="200" height="52" rx="10" class="n-proc"/>
+      <text x="390" y="213" class="t">שליפת הדף</text>
+      <text x="390" y="230" class="ts">רק http/s · עד ~2MB · עם timeout</text>
+      <path d="M390,148 L390,192" class="edge" marker-end="url(#a4)"/>
+
+      <rect x="40" y="192" width="180" height="52" rx="10" class="n-err"/>
+      <text x="130" y="213" class="t">status='failed'</text>
+      <text x="130" y="230" class="ts">+ סיבה ברורה למשתמש</text>
+      <path d="M290,218 L220,218" class="edge" marker-end="url(#a4)"/>
+      <text x="255" y="208" class="elab">שגיאה</text>
+
+      <rect x="270" y="292" width="240" height="56" rx="10" class="n-dec"/>
+      <text x="390" y="314" class="t">?התוכן כבר עובד בעבר</text>
+      <text x="390" y="332" class="ts">content_hash + pipeline_version</text>
+      <path d="M390,244 L390,292" class="edge" marker-end="url(#a4)"/>
+
+      <rect x="570" y="292" width="190" height="56" rx="10" class="n-cache"/>
+      <text x="665" y="314" class="t">קישור לתוכן הקיים</text>
+      <text x="665" y="332" class="ts">בלי עיבוד חוזר — כמעט מיידי</text>
+      <path d="M510,320 L570,320" class="edge" marker-end="url(#a4)"/>
+      <text x="540" y="310" class="elab">כן (HIT)</text>
+
+      <rect x="290" y="396" width="200" height="42" rx="10" class="n-proc"/>
+      <text x="390" y="414" class="t">חילוץ טקסט מה-HTML</text>
+      <text x="390" y="430" class="ts">html_to_text()</text>
+      <path d="M390,348 L390,396" class="edge" marker-end="url(#a4)"/>
+      <text x="420" y="372" class="elab">לא (MISS)</text>
+
+      <rect x="290" y="466" width="200" height="42" rx="10" class="n-proc"/>
+      <text x="390" y="484" class="t">חיתוך לקטעים</text>
+      <text x="390" y="500" class="ts">לפי כותרות, בלי לחתוך רעיון</text>
+      <path d="M390,438 L390,466" class="edge" marker-end="url(#a4)"/>
+
+      <rect x="290" y="536" width="200" height="42" rx="10" class="n-llm"/>
+      <text x="390" y="554" class="t">embeddings + שמירה</text>
+      <text x="390" y="570" class="ts">pgvector upsert</text>
+      <path d="M390,508 L390,536" class="edge" marker-end="url(#a4)"/>
+
+      <rect x="40" y="536" width="190" height="56" rx="10" class="n-dec"/>
+      <text x="135" y="558" class="t">כותרת אוטומטית</text>
+      <text x="135" y="576" class="ts">&lt;title&gt;/&lt;h1&gt;, ואם אין — סיכום LLM</text>
+      <path d="M290,560 L230,560" class="edge" marker-end="url(#a4)"/>
+
+      <rect x="270" y="628" width="240" height="52" rx="10" class="n-ok"/>
+      <text x="390" y="649" class="t">status='ready'</text>
+      <text x="390" y="666" class="ts">chunk_range + topic_embedding (centroid)</text>
+      <path d="M135,592 C 135,650 220,652 270,652" class="edge" marker-end="url(#a4)"/>
+      <path d="M665,348 C 665,640 560,652 510,652" class="edge" marker-end="url(#a4)"/>
+
+      <text x="620" y="690" class="ts" text-anchor="start">מכאן — נושא לכל דבר (תרשים 1)</text>
+    </svg>
+  </div></div>
+
+  <h2>5. קאש היצירה — עצלן, מוגבל, מתחלף<span class="tnum">T10</span></h2>
+  <p>חל על הסברים ושאלות מבחן. הערכת ה-Critic — לעולם לא.</p>
+  <div class="diagram-wrap"><div class="diagram">
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"/></marker></defs>
+
+      <rect x="280" y="10" width="200" height="46" rx="23" class="n-proc"/>
+      <text x="380" y="30" class="t">בקשה: (נושא, מצב, רמה)</text>
+      <text x="380" y="46" class="ts">כפתור מהמשתמש</text>
+
+      <rect x="260" y="100" width="240" height="56" rx="10" class="n-dec"/>
+      <text x="380" y="122" class="t">?כמה גרסאות שמורות למפתח הזה</text>
+      <text x="380" y="140" class="ts">(topic, mode, level, prompt_version)</text>
+      <path d="M380,56 L380,100" class="edge" marker-end="url(#a5)"/>
+
+      <rect x="60" y="210" width="220" height="56" rx="10" class="n-llm"/>
+      <text x="170" y="232" class="t">יצירה חיה מה-LLM</text>
+      <text x="170" y="250" class="ts">+ שמירת הגרסה החדשה בקאש</text>
+      <path d="M310,156 L210,210" class="edge" marker-end="url(#a5)"/>
+      <text x="235" y="188" class="elab">פחות מ-3</text>
+
+      <rect x="480" y="210" width="220" height="56" rx="10" class="n-cache"/>
+      <text x="590" y="232" class="t">בחירה אקראית מהקיימות</text>
+      <text x="590" y="250" class="ts">אפס קריאות LLM</text>
+      <path d="M450,156 L550,210" class="edge" marker-end="url(#a5)"/>
+      <text x="525" y="188" class="elab">בדיוק 3</text>
+
+      <rect x="290" y="306" width="180" height="42" rx="21" class="n-ok"/>
+      <text x="380" y="332" class="t">תשובה למשתמש</text>
+      <path d="M170,266 C 170,330 250,327 290,327" class="edge" marker-end="url(#a5)"/>
+      <path d="M590,266 C 590,330 510,327 470,327" class="edge" marker-end="url(#a5)"/>
+
+      <text x="740" y="120" class="ts" text-anchor="end">שינוי גרסת פרומפט ← סט גרסאות חדש</text>
+    </svg>
+  </div></div>
+  <div class="note">
+    <strong>התוצאה:</strong> עלות ה-LLM חסומה ב-<code>נושאים × מצבים × רמות × 3</code> —
+    לא תלויה בכמות המשתמשים. דמו של ~100 איש: פחות מדולר (רק ה-Critic החי גדל עם המשתמשים).
+  </div>
+
+  <h2>6. שומר הטקסט החופשי — אבטחה ומכסה<span class="tnum">T11</span></h2>
+  <p>רץ לפני שכל קלט חופשי מגיע ל-LLM. לחיצות כפתור מדלגות עליו.</p>
+  <div class="diagram-wrap"><div class="diagram">
+    <svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a6" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"/></marker></defs>
+
+      <rect x="280" y="10" width="200" height="46" rx="23" class="n-proc"/>
+      <text x="380" y="30" class="t">הודעת טקסט חופשי</text>
+      <text x="380" y="46" class="ts">שאלה או תשובת מבחן</text>
+
+      <rect x="280" y="100" width="200" height="52" rx="10" class="n-dec"/>
+      <text x="380" y="121" class="t">?API key תקין + קצב תקין</text>
+      <text x="380" y="138" class="ts">rate limit פר-מפתח, לא רק גלובלי</text>
+      <path d="M380,56 L380,100" class="edge" marker-end="url(#a6)"/>
+
+      <rect x="50" y="100" width="160" height="46" rx="10" class="n-err"/>
+      <text x="130" y="127" class="t">401 / 429</text>
+      <path d="M280,126 L210,124" class="edge" marker-end="url(#a6)"/>
+      <text x="245" y="114" class="elab">לא</text>
+
+      <rect x="290" y="196" width="180" height="46" rx="10" class="n-llm"/>
+      <text x="380" y="216" class="t">embedding להודעה</text>
+      <text x="380" y="232" class="ts">קריאה זולה אחת</text>
+      <path d="M380,152 L380,196" class="edge" marker-end="url(#a6)"/>
+      <text x="410" y="178" class="elab">כן</text>
+
+      <rect x="260" y="286" width="240" height="56" rx="10" class="n-dec"/>
+      <text x="380" y="308" class="t">?דומה מספיק לקורפוס הנושאים</text>
+      <text x="380" y="326" class="ts">סף מכויל אמפירית, יושב ב-env</text>
+      <path d="M380,242 L380,286" class="edge" marker-end="url(#a6)"/>
+
+      <rect x="30" y="286" width="200" height="66" rx="10" class="n-err"/>
+      <text x="130" y="309" class="t">סירוב מנומס</text>
+      <text x="130" y="326" class="ts">"עונה רק על ארכיטקטורה ודזיין פטרנס"</text>
+      <text x="130" y="342" class="ts">ה-LLM לא נקרא בכלל</text>
+      <path d="M260,316 L230,316" class="edge" marker-end="url(#a6)"/>
+      <text x="245" y="306" class="elab">לא</text>
+
+      <rect x="290" y="382" width="180" height="42" rx="21" class="n-ok"/>
+      <text x="380" y="408" class="t">ממשיכים לגרף הסוכנים</text>
+      <path d="M380,342 L380,382" class="edge" marker-end="url(#a6)"/>
+      <text x="410" y="366" class="elab">כן</text>
+    </svg>
+  </div></div>
+
+  <h2>מפה: תרשים ← נושא משימות</h2>
+  <table>
+    <tr><th>תרשים</th><th>מה הוא מממש</th><th>נושאים ב-TASKS.md</th></tr>
+    <tr><td>1. מסע המשתמש</td><td>כל חוויית המוצר</td><td>T3, T4, T6, T7, T8, T9, T12</td></tr>
+    <tr><td>2. שכבות</td><td>גבולות המודולים</td><td>T1, T12</td></tr>
+    <tr><td>3. גרף הסוכנים</td><td>לולאת הליבה + טיפול בכשלים</td><td>T5, T6, T7, T9</td></tr>
+    <tr><td>4. קליטת URL</td><td>F1.5 מקצה לקצה</td><td>T2, T4</td></tr>
+    <tr><td>5. קאש היצירה</td><td>שליטה בעלויות</td><td>T10</td></tr>
+    <tr><td>6. שומר טקסט חופשי</td><td>אבטחה + הגנת מכסה</td><td>T11</td></tr>
+  </table>
+
+  <footer>
+    גרסה אנגלית (Mermaid): <code>docs/FLOW.md</code> · משימות: <code>docs/TASKS.md</code> ·
+    מדריך מלא: <code>docs/he/dev-guide.html</code> · פירוט טכני: <code>docs/ARCHITECTURE.md</code>
+  </footer>
+
+</div>
+</body>
+</html>
